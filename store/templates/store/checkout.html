@@ -125,8 +125,8 @@
         }
 
         if(user == 'AnonymousUser'){
-            userFormData.name = form.address.value
-            userFormData.city = email.city.value
+            userFormData.name = form.name.value
+            userFormData.email = form.email.value
         }
 
         var url = '/process-order/'
@@ -144,6 +144,10 @@
         .then((data) => {
             console.log(data)
             alert('Trasaction Successsfull')
+            cart = {}
+            document.cookie = 'cart=' + JSON.stringify(cart) + ';domain=;path=/'
+
+
             window.location.href = "{% url 'store' %}"
         })
     }

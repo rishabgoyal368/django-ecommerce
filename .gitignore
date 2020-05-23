@@ -1,0 +1,5 @@
+static/images
+static/migrations
+store/migrations
+db.sqlite3
+store/__pycache__/

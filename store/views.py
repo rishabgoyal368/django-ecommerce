@@ -3,87 +3,39 @@ from .models import *
 from django.http import JsonResponse
 import json
 import datetime
+from .utils import cookieCart, cartData, guestOrder
 # Create your views here.
 
 
-def cart_total(request):
-    if request.user.is_authenticated:
-        customer = request.user.customer  # get user
-        order, created = Order.objects.get_or_create(
-            customer=customer, complete=False)
-        items = order.orderitem_set.all()
-        # return HttpResponse(items)
-        cartItem = order.get_cart_items
-    else:
-        try:
-            cart = json.loads(request.COOKIES['cart'])
-        except:
-            cart = {}
-        items = []
-        order = {'get_cart_total': 0, 'get_cart_items': 0, 'shipping': False}
-        cartItem = order['get_cart_items']
-        # for i in cart:
-        #     cartItem += cart[i]['quantity']
-    return cartItem
-
-
 def store(request):
-    cartItem = cart_total(request)
+
+    data = cookieCart(request)
+    cartItems = data['cartItems']
+
     products = Product.objects.all()
-    context = {'products': products, 'cartItem': cartItem}
+    context = {'products': products, 'cartItem': cartItems}
     return render(request, 'store/store.html', context)
 
 
 def cart(request):
-    cartItem = cart_total(request)
-    if request.user.is_authenticated:
-        customer = request.user.customer  # get user
-        order, created = Order.objects.get_or_create(
-            customer=customer, complete=False)
-        items = order.orderitem_set.all()
-        # return HttpResponse(items)
-    else:
-        try:
-            cart = json.loads(request.COOKIES['cart'])
-        except:
-            cart = {}
-        items = []
-        order = {'get_cart_total': 0, 'get_cart_items': 0, 'shipping': False}
-        cartItems = order['get_cart_items']
-        for i in cart:
-            cartItem += cart[i]['quantity']
-            product = Product.objects.get(id=i)
-            total = (product.price + cart[i]['quantity'])
-            order['get_cart_total'] += total
-            order['get_cart_items'] += cart[i]['quantity']
-            item = {
-                'product': {
-                    'id': product.id,
-                    'name': product.name,
-                    'price':product.price,
-                    'imageURL':product.imageURL,
-                },
-                'quantity': cart[i]['quantity'],
-                'get_total': total,
-            }
-            items.append(item)
 
-    context = {'items': items, 'order': order, 'cartItem': cartItem}
+    data = cookieCart(request)
+    cartItems = data['cartItems']
+    items = data['items']
+    order = data['order']
+
+    context = {'items': items, 'order': order, 'cartItem': cartItems}
     return render(request, 'store/cart.html', context)
 
 
 def checkout(request):
-    cartItem = cart_total(request)
-    if request.user.is_authenticated:
-        customer = request.user.customer  # get user
-        order, created = Order.objects.get_or_create(
-            customer=customer, complete=False)
-        items = order.orderitem_set.all()
-        # return HttpResponse(items)
-    else:
-        items = []
-        order = {'get_cart_total': 0, 'get_cart_items': 0, 'shipping': False}
-    context = {'items': items, 'order': order, 'cartItem': cartItem}
+
+    data = cookieCart(request)
+    cartItems = data['cartItems']
+    items = data['items']
+    order = data['order']
+
+    context = {'items': items, 'order': order, 'cartItem': cartItems}
     return render(request, 'store/checkout.html', context)
 
 
@@ -113,30 +65,32 @@ def updateItem(request):
 
 
 def processOrder(request):
-    trasaction_id = datetime.datetime.now().timestamp()
+    transaction_id = datetime.datetime.now().timestamp()
     data = json.loads(request.body)
     if request.user.is_authenticated:
         customer = request.user.customer
         order, created = Order.objects.get_or_create(
             customer=customer, complete=False)
-        total = float(data['form']['total'])
-        order.trasaction_id = trasaction_id
-
-        if total == order.get_cart_total:
-            order.complete = True
-
-        order.save()
-
-        if order.shipping == True:
-            ShippingAddress.objects.create(
-                customer=customer,
-                order=order,
-                address=data['shipping']['address'],
-                city=data['shipping']['city'],
-                state=data['shipping']['state'],
-                zipcode=data['shipping']['zipcode'],
-            )
 
     else:
-        print('user not logged in')
+        customer, order = guestOrder(request, data)
+
+    total = float(data['form']['total'])
+    order.transaction_id = transaction_id
+
+    if total == order.get_cart_total:
+        order.complete = True
+
+    order.save()
+
+    if order.shipping == True:
+        ShippingAddress.objects.create(
+            customer=customer,
+            order=order,
+            address=data['shipping']['address'],
+            city=data['shipping']['city'],
+            state=data['shipping']['state'],
+            zipcode=data['shipping']['zipcode'],
+        )
+
     return JsonResponse('Payment Complete', safe=False)
